@@ -5,6 +5,7 @@ namespace Sample.Components.StateMachines
     using Automatonymous;
     using Contracts;
     using MassTransit;
+    using Microsoft.Extensions.Logging;
     using OrderStateMachineActivities;
 
 
@@ -35,6 +36,8 @@ namespace Sample.Components.StateMachines
 
             Initially(
                 When(OrderSubmitted)
+                    .Activity(x => x.OfType<SagaActivity1>())
+                    .Activity(x => x.OfType<SagaActivity2>())
                     .Then(context =>
                     {
                         context.Instance.SubmitDate = context.Data.Timestamp;

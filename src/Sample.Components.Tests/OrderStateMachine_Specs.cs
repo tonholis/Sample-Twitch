@@ -8,6 +8,9 @@ namespace Sample.Components.Tests
     using Contracts;
     using MassTransit;
     using MassTransit.Testing;
+    using Microsoft.Extensions.DependencyInjection;
+    using Microsoft.Extensions.Logging;
+    using Microsoft.Extensions.Logging.Abstractions;
     using NUnit.Framework;
     using StateMachines;
 
@@ -15,14 +18,36 @@ namespace Sample.Components.Tests
     [TestFixture]
     public class Submitting_an_order
     {
+        private ServiceProvider _container;
+
+        [OneTimeSetUp]
+        public void Setup()
+        {
+            var services = new ServiceCollection();
+            services.AddScoped<Dependency>();
+            services.AddScoped<SagaActivity1>();
+            services.AddScoped<SagaActivity2>();
+            
+            services.AddInMemoryTestHarness(cfg =>
+            {
+                cfg.AddSagaStateMachine<OrderStateMachine, OrderState>()
+                    .InMemoryRepository();
+            });
+            
+            _container = services.BuildServiceProvider(true);
+        }
+        
         [Test]
         public async Task Should_create_a_state_instance()
         {
-            var orderStateMachine = new OrderStateMachine();
+            // var orderStateMachine = new OrderStateMachine();
+            // var harness = new InMemoryTestHarness();
+            // var saga = harness.StateMachineSaga<OrderState, OrderStateMachine>(orderStateMachine);
 
-            var harness = new InMemoryTestHarness();
-            var saga = harness.StateMachineSaga<OrderState, OrderStateMachine>(orderStateMachine);
-
+            var harness = _container.GetRequiredService<InMemoryTestHarness>();
+            var machine = _container.GetRequiredService<OrderStateMachine>();
+            var saga = harness.StateMachineSaga<OrderState, OrderStateMachine>(machine);
+            
             await harness.Start();
             try
             {
