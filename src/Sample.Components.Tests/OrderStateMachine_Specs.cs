@@ -7,10 +7,10 @@ namespace Sample.Components.Tests
     using Automatonymous.Visualizer;
     using Contracts;
     using MassTransit;
+    using MassTransit.Definition;
+    using MassTransit.Saga;
     using MassTransit.Testing;
     using Microsoft.Extensions.DependencyInjection;
-    using Microsoft.Extensions.Logging;
-    using Microsoft.Extensions.Logging.Abstractions;
     using NUnit.Framework;
     using StateMachines;
 
@@ -27,13 +27,16 @@ namespace Sample.Components.Tests
             services.AddScoped<Dependency>();
             services.AddScoped<SagaActivity1>();
             services.AddScoped<SagaActivity2>();
-
-            services.AddSagaTestHarness<OrderState>();
+            services.AddScoped<OrderStateMachine>();
+            
+            services.AddStateMachineSagaTestHarness<OrderState, OrderStateMachine>();
             services.AddInMemoryTestHarness(cfg =>
             {
-                cfg.AddSagaStateMachine<OrderStateMachine, OrderState>();
+                //If added, it raises MassTransit.ConfigurationException : A receive endpoint with the same key was already added: OrderState
+                // commented since StateMachineSagaTestHarness configures the named endpoint
+                // cfg.AddSagaStateMachine<OrderStateMachine, OrderState>();
             });
-            
+          
             _container = services.BuildServiceProvider(true);
         }
         
@@ -41,14 +44,13 @@ namespace Sample.Components.Tests
         public async Task Should_create_a_state_instance()
         {
             var harness = _container.GetRequiredService<BusTestHarness>();
-            var machine = _container.GetRequiredService<OrderStateMachine>();
-            var saga = harness.StateMachineSaga<OrderState, OrderStateMachine>(machine);
+            var saga = _container.GetRequiredService<StateMachineSagaTestHarness<OrderState, OrderStateMachine>>();
             
             await harness.Start();
             try
             {
                 var orderId = NewId.NextGuid();
-
+                
                 await harness.Bus.Publish<OrderSubmitted>(new
                 {
                     OrderId = orderId,
@@ -74,7 +76,6 @@ namespace Sample.Components.Tests
         public async Task Should_respond_to_status_checks()
         {
             var orderStateMachine = new OrderStateMachine();
-
             var harness = new InMemoryTestHarness();
             var saga = harness.StateMachineSaga<OrderState, OrderStateMachine>(orderStateMachine);
 

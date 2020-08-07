@@ -1,6 +1,7 @@
 namespace Sample.Components.Tests
 {
     using System;
+    using Automatonymous;
     using MassTransit;
     using MassTransit.Definition;
     using MassTransit.ExtensionsDependencyInjectionIntegration;
@@ -43,19 +44,19 @@ namespace Sample.Components.Tests
             {
                 var testHarness = provider.GetRequiredService<BusTestHarness>();
                 var sagaRepository = provider.GetRequiredService<InMemorySagaRepository<T>>();
-
+            
                 var formatter = provider.GetService<IEndpointNameFormatter>() ?? DefaultEndpointNameFormatter.Instance;
-
+            
                 string queueName = formatter.Saga<T>();
-
+            
                 return new ContainerSagaTestHarness<T>(testHarness, sagaRepository, queueName);
             });
+            
             services.AddSingleton<SagaTestHarness<T>>(provider => provider.GetRequiredService<ContainerSagaTestHarness<T>>());
             services.AddSingleton(provider => provider.GetRequiredService<ContainerSagaTestHarness<T>>().Repository);
-
+          
             return services;
         }
-
 
         class ContainerSagaTestHarness<TSaga> :
             SagaTestHarness<TSaga>
@@ -68,5 +69,44 @@ namespace Sample.Components.Tests
 
             public ISagaRepository<TSaga> Repository => TestRepository;
         }
+        
+        
+        public static IServiceCollection AddStateMachineSagaTestHarness<TInstance, TStateMachine>(this IServiceCollection services)
+            where TInstance : class, SagaStateMachineInstance
+            where TStateMachine : SagaStateMachine<TInstance>, new()
+        {
+            services.AddSingleton<InMemorySagaRepository<TInstance>>();
+            
+            services.AddSingleton(provider =>
+            {
+                var testHarness = provider.GetRequiredService<BusTestHarness>();
+                var sagaRepository = provider.GetRequiredService<InMemorySagaRepository<TInstance>>();
+                var stateMachine = new TStateMachine();
+                
+                var formatter = provider.GetService<IEndpointNameFormatter>() ?? DefaultEndpointNameFormatter.Instance;
+                string queueName = formatter.Saga<TInstance>();
+                
+                return new ContainerStateMachineSagaTestHarness<TInstance,TStateMachine>(testHarness, sagaRepository, stateMachine, queueName);
+            });
+            
+            services.AddSingleton<StateMachineSagaTestHarness<TInstance, TStateMachine>>(provider => provider.GetRequiredService<ContainerStateMachineSagaTestHarness<TInstance,TStateMachine>>());
+            services.AddSingleton(provider => provider.GetRequiredService<ContainerStateMachineSagaTestHarness<TInstance,TStateMachine>>().Repository);
+  
+            return services;
+        }
+        
+        class ContainerStateMachineSagaTestHarness<TInstance, TStateMachine> :
+            StateMachineSagaTestHarness<TInstance, TStateMachine>
+            where TInstance : class, SagaStateMachineInstance
+            where TStateMachine : SagaStateMachine<TInstance>
+        {
+            public ContainerStateMachineSagaTestHarness(BusTestHarness testHarness, ISagaRepository<TInstance> repository, TStateMachine stateMachine, string queueName)
+                : base(testHarness, repository, stateMachine, queueName)
+            {
+            }
+
+            public ISagaRepository<TInstance> Repository => TestRepository;
+        }
+        
     }
 }
