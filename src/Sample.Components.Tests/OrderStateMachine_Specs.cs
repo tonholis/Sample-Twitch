@@ -20,18 +20,18 @@ namespace Sample.Components.Tests
     {
         private ServiceProvider _container;
 
-        [OneTimeSetUp]
+        [SetUp]
         public void Setup()
         {
             var services = new ServiceCollection();
             services.AddScoped<Dependency>();
             services.AddScoped<SagaActivity1>();
             services.AddScoped<SagaActivity2>();
-            
+
+            services.AddSagaTestHarness<OrderState>();
             services.AddInMemoryTestHarness(cfg =>
             {
-                cfg.AddSagaStateMachine<OrderStateMachine, OrderState>()
-                    .InMemoryRepository();
+                cfg.AddSagaStateMachine<OrderStateMachine, OrderState>();
             });
             
             _container = services.BuildServiceProvider(true);
@@ -40,11 +40,7 @@ namespace Sample.Components.Tests
         [Test]
         public async Task Should_create_a_state_instance()
         {
-            // var orderStateMachine = new OrderStateMachine();
-            // var harness = new InMemoryTestHarness();
-            // var saga = harness.StateMachineSaga<OrderState, OrderStateMachine>(orderStateMachine);
-
-            var harness = _container.GetRequiredService<InMemoryTestHarness>();
+            var harness = _container.GetRequiredService<BusTestHarness>();
             var machine = _container.GetRequiredService<OrderStateMachine>();
             var saga = harness.StateMachineSaga<OrderState, OrderStateMachine>(machine);
             
@@ -61,7 +57,7 @@ namespace Sample.Components.Tests
                 });
 
                 Assert.That(saga.Created.Select(x => x.CorrelationId == orderId).Any(), Is.True);
-
+                
                 var instanceId = await saga.Exists(orderId, x => x.Submitted);
                 Assert.That(instanceId, Is.Not.Null);
 
